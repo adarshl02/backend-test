@@ -8,7 +8,7 @@ app.get("/health", (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.status(200).send("infra-career backend is running from green deployment pipeline");
+  res.status(200).send("infra-career backend is running from blue deployment pipeline");
 });
 
 app.listen(port, () => {
