@@ -2,8 +2,8 @@ name: Backend CI/CD Pipeline
 
 on:
   push:
-    branches:
-      - main
+    branches: ["main"]
+      
 
 env:
   AWS_REGION: ap-south-1
