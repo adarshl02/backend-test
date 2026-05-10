@@ -1,0 +1,77 @@
+name: Backend CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: ap-south-1
+  ECR_REPOSITORY: infra-career-backend
+  INSTANCE_NAME_TAG: infra-career-backend
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-push-deploy:
+    name: Build, Push to ECR, and Deploy to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      # ------------------------------------------------------------
+      # 1. Checkout Source Code
+      # ------------------------------------------------------------
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------
+      # 2. Configure AWS Credentials
+      #    Uses AWS Access Key ID and Secret Access Key stored
+      #    in GitHub Secrets.
+      # ------------------------------------------------------------
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ------------------------------------------------------------
+      # 3. Login to Amazon ECR
+      # ------------------------------------------------------------
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ------------------------------------------------------------
+      # 4. Set Up Docker Buildx
+      # ------------------------------------------------------------
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ------------------------------------------------------------
+      # 5. Build and Push Docker Image
+      #    Tags:
+      #      - <commit-sha>
+      #      - latest
+      # ------------------------------------------------------------
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+      # ------------------------------------------------------------
+      # 6. Deploy Latest Image to EC2 via AWS Systems Manager
+      # ------------------------------------------------------------
+      - name: Deploy to EC2 via AWS SSM
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Name,Values=${INSTANCE_NAME_TAG}" \
+            --parameters 'commands=["/usr/local/bin/deploy_backend.sh latest"]' \
+            --comment "Deploy backend Docker image" \
+            --timeout-seconds 600
