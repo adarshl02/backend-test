@@ -6,6 +6,7 @@ on:
     paths:
       - "Backend/**"
       - ".github/workflows/backend-cicd.yml"
+  workflow_dispatch:
       
 
 env:
